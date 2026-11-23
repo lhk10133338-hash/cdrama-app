@@ -16,6 +16,9 @@
     cc_lang_pref: 'ko',
     hl: 'ko',
     playsinline: 1,
+    controls: 0,
+    fs: 0,
+    disablekb: 1,
     rel: 0,
     modestbranding: 1,
     iv_load_policy: 3,
@@ -35,6 +38,9 @@
     hero: { index: 0, timer: null, count: 0 },
     player: null,
     progressTimer: null,
+    uiTimer: null,
+    ccOn: true,
+    seeking: false,
     ytPromise: null,
     current: { drama: null, ep: null }
   };
@@ -641,13 +647,39 @@
 
     $('#view').innerHTML = `
       <div class="player-screen" id="playerScreen">
-        <div class="player-stage" id="playerStage">
+        <div class="player-stage show-ui" id="playerStage">
           <div id="ytplayer"></div>
-          <div class="player-top">
-            <button class="icon-btn" id="closePlayer" aria-label="닫기">
-              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
-            </button>
-            <span class="t">${esc(drama.title)} · ${ep.n}화</span>
+          <div class="player-tap" id="playerTap" aria-label="플레이어 제어"></div>
+          <div class="player-ui" id="playerUi">
+            <div class="player-top">
+              <button class="icon-btn" id="closePlayer" aria-label="닫기">
+                <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
+              </button>
+              <span class="t">${esc(drama.title)} · ${ep.n}화</span>
+              <button class="cc-btn on" id="btnCC" type="button" aria-label="한국어 자막 켜기/끄기">CC</button>
+            </div>
+            <div class="player-center">
+              <button class="ctrl-btn" id="btnBack10" type="button" aria-label="10초 뒤로">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 17l-5-5 5-5"/><path d="M18 17l-5-5 5-5"/></svg>
+                <span>10</span>
+              </button>
+              <button class="ctrl-btn play" id="btnPlayPause" type="button" aria-label="재생/일시정지">
+                <svg id="icoPlay" viewBox="0 0 24 24" width="30" height="30"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg>
+                <svg id="icoPause" viewBox="0 0 24 24" width="30" height="30" style="display:none"><rect x="6.5" y="5" width="4" height="14" rx="1" fill="currentColor"/><rect x="13.5" y="5" width="4" height="14" rx="1" fill="currentColor"/></svg>
+              </button>
+              <button class="ctrl-btn" id="btnFwd10" type="button" aria-label="10초 앞으로">
+                <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 17l5-5-5-5"/><path d="M6 17l5-5-5-5"/></svg>
+                <span>10</span>
+              </button>
+            </div>
+            <div class="player-bar">
+              <span class="ptime" id="pCur">0:00</span>
+              <input class="seek" id="pSeek" type="range" min="0" max="1000" value="0" aria-label="재생 위치" />
+              <span class="ptime" id="pDur">${esc(ep.duration || fmtDur(ep.durationSec) || '0:00')}</span>
+              <button class="icon-btn fs-btn" id="btnFS" type="button" aria-label="전체화면">
+                <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+              </button>
+            </div>
           </div>
           <div class="player-error" id="playerError" hidden>
             <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="#ffb4b4" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.2v.2"/></svg>
@@ -690,7 +722,138 @@
       renderWatch();
     });
 
+    bindCustomPlayerUI();
     mountPlayer(ep, startSec);
+  }
+
+  function showPlayerUI(autoHide) {
+    const stage = $('#playerStage');
+    if (!stage) return;
+    stage.classList.add('show-ui');
+    clearTimeout(state.uiTimer);
+    if (autoHide) {
+      state.uiTimer = setTimeout(() => {
+        const s = $('#playerStage');
+        if (s && state.player && state.player.getPlayerState && state.player.getPlayerState() === 1) {
+          s.classList.remove('show-ui');
+        }
+      }, 3200);
+    }
+  }
+
+  function setPlayIcon(playing) {
+    const p = $('#icoPlay'), pa = $('#icoPause');
+    if (p) p.style.display = playing ? 'none' : '';
+    if (pa) pa.style.display = playing ? '' : 'none';
+  }
+
+  function bindCustomPlayerUI() {
+    state.ccOn = true;
+    const tap = $('#playerTap');
+    const stage = $('#playerStage');
+    if (tap && stage) {
+      tap.addEventListener('click', () => {
+        const ps = state.player && state.player.getPlayerState ? state.player.getPlayerState() : -1;
+        if (ps === -1 || ps === 5) {
+          if (state.player && state.player.playVideo) state.player.playVideo();
+          showPlayerUI(true);
+          return;
+        }
+        if (stage.classList.contains('show-ui')) {
+          stage.classList.remove('show-ui');
+          clearTimeout(state.uiTimer);
+        } else {
+          showPlayerUI(true);
+        }
+      });
+    }
+    const playBtn = $('#btnPlayPause');
+    if (playBtn) playBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!state.player || !state.player.getPlayerState) return;
+      const ps = state.player.getPlayerState();
+      if (ps === 1) {
+        state.player.pauseVideo();
+        showPlayerUI(false);
+      } else {
+        state.player.playVideo();
+        showPlayerUI(true);
+      }
+    });
+    const back10 = $('#btnBack10');
+    if (back10) back10.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!state.player || !state.player.seekTo) return;
+      state.player.seekTo(Math.max(0, currentTime() - 10), true);
+      updateSeekUI();
+      showPlayerUI(true);
+    });
+    const fwd10 = $('#btnFwd10');
+    if (fwd10) fwd10.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!state.player || !state.player.seekTo) return;
+      const dur = currentDuration() || 99999;
+      state.player.seekTo(Math.min(dur, currentTime() + 10), true);
+      updateSeekUI();
+      showPlayerUI(true);
+    });
+    const ccBtn = $('#btnCC');
+    if (ccBtn) ccBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      state.ccOn = !state.ccOn;
+      ccBtn.classList.toggle('on', state.ccOn);
+      try {
+        if (state.player && state.player.setOption) {
+          state.player.setOption('captions', 'track', state.ccOn ? { languageCode: 'ko' } : {});
+        }
+      } catch (err) { /* noop */ }
+      toast(state.ccOn ? '한국어 자막 켜짐' : '자막 꺼짐');
+      showPlayerUI(true);
+    });
+    const seek = $('#pSeek');
+    if (seek) {
+      seek.addEventListener('input', () => {
+        state.seeking = true;
+        const dur = currentDuration() || (state.current.ep && state.current.ep.durationSec) || 0;
+        const t = (Number(seek.value) / 1000) * dur;
+        const cur = $('#pCur');
+        if (cur) cur.textContent = fmtDur(Math.floor(t));
+        showPlayerUI(false);
+      });
+      seek.addEventListener('change', () => {
+        const dur = currentDuration() || (state.current.ep && state.current.ep.durationSec) || 0;
+        const t = (Number(seek.value) / 1000) * dur;
+        if (state.player && state.player.seekTo) state.player.seekTo(t, true);
+        state.seeking = false;
+        showPlayerUI(true);
+      });
+    }
+    const fsBtn = $('#btnFS');
+    if (fsBtn && stage) fsBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      } else if (stage.requestFullscreen) {
+        stage.requestFullscreen().catch(() => stage.classList.toggle('is-fs'));
+      } else {
+        stage.classList.toggle('is-fs');
+      }
+      showPlayerUI(true);
+    });
+  }
+
+  function updateSeekUI() {
+    if (state.seeking) return;
+    const t = currentTime();
+    const dur = currentDuration() || (state.current.ep && state.current.ep.durationSec) || 0;
+    const curEl = $('#pCur'), durEl = $('#pDur'), seekEl = $('#pSeek');
+    if (curEl) curEl.textContent = fmtDur(Math.floor(t));
+    if (durEl && dur) durEl.textContent = fmtDur(Math.floor(dur));
+    if (seekEl && dur) {
+      const pct = Math.min(1000, Math.max(0, Math.round((t / dur) * 1000)));
+      seekEl.value = String(pct);
+      seekEl.style.setProperty('--pct', `${(pct / 10).toFixed(1)}%`);
+    }
   }
 
   function mountPlayer(ep, startSec) {
@@ -706,15 +869,22 @@
             onReady: (e) => {
               try { e.target.setOption('captions', 'track', { languageCode: 'ko' }); } catch (err) { /* 자막 트랙 없음 */ }
               if (startSec > 5) e.target.seekTo(startSec, true);
+              updateSeekUI();
               startProgressTimer();
             },
             onStateChange: (e) => {
               if (e.data === YT.PlayerState.PLAYING) {
                 hidePlayerError();
+                setPlayIcon(true);
+                showPlayerUI(true);
                 startProgressTimer();
               } else if (e.data === YT.PlayerState.PAUSED) {
+                setPlayIcon(false);
+                showPlayerUI(false);
                 saveProgress();
               } else if (e.data === YT.PlayerState.ENDED) {
+                setPlayIcon(false);
+                showPlayerUI(false);
                 markSeen();
                 saveProgress(true);
                 showNextHint();
@@ -731,7 +901,12 @@
 
   function startProgressTimer() {
     clearInterval(state.progressTimer);
-    state.progressTimer = setInterval(saveProgress, 5000);
+    let tick = 0;
+    state.progressTimer = setInterval(() => {
+      updateSeekUI();
+      tick += 1;
+      if (tick % 5 === 0) saveProgress();
+    }, 1000);
   }
   function currentTime() {
     try { return state.player && state.player.getCurrentTime ? state.player.getCurrentTime() : 0; }
@@ -788,6 +963,7 @@
   }
   function destroyPlayer() {
     clearInterval(state.progressTimer);
+    clearTimeout(state.uiTimer);
     saveProgress(true);
     try { if (state.player && state.player.destroy) state.player.destroy(); } catch (e) { /* noop */ }
     state.player = null;
