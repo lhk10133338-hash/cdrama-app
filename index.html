@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>CDRAMA — 중국 드라마</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#111214">
+<meta name="description" content="한국어 자막으로 즐기는 중국 드라마 스트리밍">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app" class="app">
+  <header class="topbar" id="topbar">
+    <a class="brand" href="#/home" aria-label="CDRAMA 홈">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="20" height="20"><path d="M8 5.5v13l11-6.5z" fill="currentColor"/></svg>
+      </span>
+      <span class="brand-name">CDRAMA</span>
+    </a>
+    <div class="topbar-actions">
+      <button class="icon-btn" id="btnSearch" aria-label="검색">
+        <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.2-3.2"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main id="view" class="view" role="main"></main>
+
+  <nav class="tabbar" id="tabbar" aria-label="주요 메뉴">
+    <a class="tab" data-tab="home" href="#/home">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.6 12 3l9 7.6"/><path d="M5.5 9.5V21h13V9.5"/></svg>
+      <span>홈</span>
+    </a>
+    <a class="tab" data-tab="explore" href="#/explore">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>
+      <span>탐색</span>
+    </a>
+    <a class="tab" data-tab="library" href="#/library">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4h12v17l-6-4.2L6 21z"/></svg>
+      <span>보관함</span>
+    </a>
+  </nav>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script src="js/app.js" defer></script>
+</body>
+</html>

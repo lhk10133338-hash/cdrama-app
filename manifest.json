@@ -1,0 +1,59 @@
+{
+  "name": "CDRAMA — 중국 드라마",
+  "short_name": "CDRAMA",
+  "description": "한국어 자막으로 즐기는 중국 드라마. iQIYI Korea·WeTV Korea·YOUKU Korea 등 공식 채널의 최신 회차를 모았습니다.",
+  "lang": "ko",
+  "dir": "ltr",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
+  "orientation": "portrait",
+  "background_color": "#111214",
+  "theme_color": "#111214",
+  "categories": [
+    "entertainment",
+    "video"
+  ],
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "탐색",
+      "short_name": "탐색",
+      "url": "./index.html#/explore"
+    },
+    {
+      "name": "내 보관함",
+      "short_name": "보관함",
+      "url": "./index.html#/library"
+    }
+  ]
+}
