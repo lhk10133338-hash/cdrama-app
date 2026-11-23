@@ -2,7 +2,7 @@
  * - 앱 셸: 캐시 우선(오프라인에서도 화면은 열림)
  * - 데이터(dramas.json): 네트워크 우선 + 캐시 백업
  */
-const VERSION = 'cdrama-v5';
+const VERSION = 'cdrama-v6';
 const SHELL = [
   './',
   './index.html',

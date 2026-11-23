@@ -40,6 +40,10 @@
     progressTimer: null,
     uiTimer: null,
     ccOn: true,
+    ccLang: 'ko',
+    ccSize: 0,
+    quality: 'highres',
+    rate: 1,
     seeking: false,
     ytPromise: null,
     current: { drama: null, ep: null }
@@ -656,7 +660,8 @@
                 <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round"><path d="M6 6l12 12M18 6 6 18"/></svg>
               </button>
               <span class="t">${esc(drama.title)} · ${ep.n}화</span>
-              <button class="cc-btn on" id="btnCC" type="button" aria-label="한국어 자막 켜기/끄기">CC</button>
+              <button class="cc-btn on" id="btnCC" type="button" aria-label="자막 설정">자막</button>
+              <button class="cc-btn" id="btnQ" type="button" aria-label="화질 및 속도 설정">화질</button>
             </div>
             <div class="player-center">
               <button class="ctrl-btn" id="btnBack10" type="button" aria-label="10초 뒤로">
@@ -681,6 +686,7 @@
               </button>
             </div>
           </div>
+          <div class="player-sheet" id="playerSheet" hidden></div>
           <div class="player-error" id="playerError" hidden>
             <svg viewBox="0 0 24 24" width="34" height="34" fill="none" stroke="#ffb4b4" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.2v.2"/></svg>
             <strong>이 영상은 앱에서 재생할 수 없어요</strong>
@@ -800,15 +806,12 @@
     const ccBtn = $('#btnCC');
     if (ccBtn) ccBtn.addEventListener('click', (e) => {
       e.stopPropagation();
-      state.ccOn = !state.ccOn;
-      ccBtn.classList.toggle('on', state.ccOn);
-      try {
-        if (state.player && state.player.setOption) {
-          state.player.setOption('captions', 'track', state.ccOn ? { languageCode: 'ko' } : {});
-        }
-      } catch (err) { /* noop */ }
-      toast(state.ccOn ? '한국어 자막 켜짐' : '자막 꺼짐');
-      showPlayerUI(true);
+      openPlayerSheet('cc');
+    });
+    const qBtn = $('#btnQ');
+    if (qBtn) qBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openPlayerSheet('quality');
     });
     const seek = $('#pSeek');
     if (seek) {
@@ -842,6 +845,135 @@
     });
   }
 
+  const QUALITY_LABEL = {
+    highres: '최고화질 (4K+)', hd2160: '2160p (4K)', hd1440: '1440p (QHD)',
+    hd1080: '1080p (FHD)', hd720: '720p (HD)', large: '480p', medium: '360p',
+    small: '240p', tiny: '144p', auto: '자동'
+  };
+
+  function applyBestQuality(player) {
+    try {
+      const levels = player.getAvailableQualityLevels ? player.getAvailableQualityLevels() : [];
+      const pick = state.quality === 'highres'
+        ? (levels && levels.length ? levels[0] : 'hd1080')
+        : state.quality;
+      if (player.setPlaybackQuality) player.setPlaybackQuality(pick);
+      updateQualityBtn(pick);
+    } catch (e) { /* noop */ }
+  }
+
+  function updateQualityBtn(q) {
+    const b = $('#btnQ');
+    if (!b) return;
+    const short = q === 'highres' || q === 'hd2160' ? '4K' : q === 'hd1440' ? '1440p' : q === 'hd1080' ? '1080p' : q === 'hd720' ? '720p' : q === 'large' ? '480p' : q === 'medium' ? '360p' : '화질';
+    b.textContent = short;
+  }
+
+  function closePlayerSheet() {
+    const sheet = $('#playerSheet');
+    if (sheet) { sheet.hidden = true; sheet.innerHTML = ''; }
+  }
+
+  function openPlayerSheet(kind) {
+    const sheet = $('#playerSheet');
+    if (!sheet) return;
+    if (!sheet.hidden && sheet.dataset.kind === kind) { closePlayerSheet(); return; }
+    sheet.dataset.kind = kind;
+    clearTimeout(state.uiTimer);
+
+    if (kind === 'cc') {
+      let tracks = [];
+      try { tracks = (state.player && state.player.getOption && state.player.getOption('captions', 'tracklist')) || []; } catch (e) { tracks = []; }
+      const trackHtml = tracks.length
+        ? tracks.map(t => `<button class="sheet-opt ${state.ccOn && state.ccLang === t.languageCode ? 'on' : ''}" data-cc-lang="${esc(t.languageCode)}">${esc(t.displayName || t.languageName || t.languageCode)}</button>`).join('')
+        : `<button class="sheet-opt ${state.ccOn && state.ccLang === 'ko' ? 'on' : ''}" data-cc-lang="ko">한국어 (기본)</button>`;
+
+      sheet.innerHTML = `
+        <div class="sheet-box" id="sheetBox">
+          <div class="sheet-head"><strong>자막 설정</strong><button class="sheet-close" id="sheetClose" type="button">닫기</button></div>
+          <div class="sheet-label">자막 언어</div>
+          <div class="sheet-list">
+            <button class="sheet-opt ${!state.ccOn ? 'on' : ''}" data-cc-lang="off">자막 끄기</button>
+            ${trackHtml}
+          </div>
+          <div class="sheet-label">자막 크기</div>
+          <div class="sheet-row">
+            ${[[-1, '작게'], [0, '보통'], [1, '크게'], [2, '매우 크게']].map(([sz, lb]) => `<button class="sheet-pill ${state.ccSize === sz ? 'on' : ''}" data-cc-size="${sz}">${lb}</button>`).join('')}
+          </div>
+        </div>`;
+      sheet.hidden = false;
+      sheet.querySelectorAll('[data-cc-lang]').forEach(btn => btn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        const lang = btn.dataset.ccLang;
+        const ccBtn = $('#btnCC');
+        if (lang === 'off') {
+          state.ccOn = false;
+          try { state.player.setOption('captions', 'track', {}); } catch (e) {}
+          if (ccBtn) ccBtn.classList.remove('on');
+          toast('자막 꺼짐');
+        } else {
+          state.ccOn = true;
+          state.ccLang = lang;
+          try { state.player.setOption('captions', 'track', { languageCode: lang }); } catch (e) {}
+          if (ccBtn) ccBtn.classList.add('on');
+          toast(`${btn.textContent} 자막 선택`);
+        }
+        closePlayerSheet();
+        showPlayerUI(true);
+      }));
+      sheet.querySelectorAll('[data-cc-size]').forEach(btn => btn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        const sz = Number(btn.dataset.ccSize);
+        state.ccSize = sz;
+        try { state.player.setOption('captions', 'fontSize', sz); } catch (e) {}
+        toast(`자막 크기: ${btn.textContent}`);
+        openPlayerSheet('cc');
+      }));
+    } else {
+      let levels = [];
+      try { levels = (state.player && state.player.getAvailableQualityLevels && state.player.getAvailableQualityLevels()) || []; } catch (e) { levels = []; }
+      if (!levels.length) levels = ['hd1080', 'hd720', 'large', 'medium', 'auto'];
+      let curQ = state.quality;
+      try { if (state.player && state.player.getPlaybackQuality) curQ = state.player.getPlaybackQuality() || state.quality; } catch (e) {}
+      const rates = [0.75, 1, 1.25, 1.5, 2];
+
+      sheet.innerHTML = `
+        <div class="sheet-box" id="sheetBox">
+          <div class="sheet-head"><strong>화질 · 재생 속도</strong><button class="sheet-close" id="sheetClose" type="button">닫기</button></div>
+          <div class="sheet-label">화질 (기본: 최고화질 우선)</div>
+          <div class="sheet-list">
+            ${levels.map(q => `<button class="sheet-opt ${curQ === q ? 'on' : ''}" data-q="${esc(q)}">${esc(QUALITY_LABEL[q] || q)}</button>`).join('')}
+          </div>
+          <div class="sheet-label">재생 속도</div>
+          <div class="sheet-row">
+            ${rates.map(r => `<button class="sheet-pill ${state.rate === r ? 'on' : ''}" data-rate="${r}">${r}x</button>`).join('')}
+          </div>
+        </div>`;
+      sheet.hidden = false;
+      sheet.querySelectorAll('[data-q]').forEach(btn => btn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        const q = btn.dataset.q;
+        state.quality = q;
+        try { if (state.player && state.player.setPlaybackQuality) state.player.setPlaybackQuality(q); } catch (e) {}
+        updateQualityBtn(q);
+        toast(`화질: ${QUALITY_LABEL[q] || q}`);
+        closePlayerSheet();
+        showPlayerUI(true);
+      }));
+      sheet.querySelectorAll('[data-rate]').forEach(btn => btn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        const r = Number(btn.dataset.rate);
+        state.rate = r;
+        try { if (state.player && state.player.setPlaybackRate) state.player.setPlaybackRate(r); } catch (e) {}
+        toast(`재생 속도 ${r}x`);
+        openPlayerSheet('quality');
+      }));
+    }
+    const close = $('#sheetClose');
+    if (close) close.addEventListener('click', (ev) => { ev.stopPropagation(); closePlayerSheet(); showPlayerUI(true); });
+    sheet.onclick = (ev) => { if (ev.target === sheet) { closePlayerSheet(); showPlayerUI(true); } };
+  }
+
   function updateSeekUI() {
     if (state.seeking) return;
     const t = currentTime();
@@ -867,14 +999,19 @@
           playerVars: { ...YT_PARAMS, origin: location.origin, start: Math.floor(startSec) },
           events: {
             onReady: (e) => {
-              try { e.target.setOption('captions', 'track', { languageCode: 'ko' }); } catch (err) { /* 자막 트랙 없음 */ }
+              try { e.target.setOption('captions', 'track', { languageCode: state.ccOn ? state.ccLang : '' }); } catch (err) { /* 자막 트랙 없음 */ }
+              applyBestQuality(e.target);
               if (startSec > 5) e.target.seekTo(startSec, true);
               updateSeekUI();
               startProgressTimer();
             },
+            onPlaybackQualityChange: (e) => {
+              if (e && e.data) updateQualityBtn(e.data);
+            },
             onStateChange: (e) => {
               if (e.data === YT.PlayerState.PLAYING) {
                 hidePlayerError();
+                applyBestQuality(e.target);
                 setPlayIcon(true);
                 showPlayerUI(true);
                 startProgressTimer();
