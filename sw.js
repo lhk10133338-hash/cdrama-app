@@ -2,7 +2,7 @@
  * - 앱 셸: 캐시 우선(오프라인에서도 화면은 열림)
  * - 데이터(dramas.json): 네트워크 우선 + 캐시 백업
  */
-const VERSION = 'cdrama-v2';
+const VERSION = 'cdrama-v3';
 const SHELL = [
   './',
   './index.html',
@@ -61,15 +61,12 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 정적 자원: 캐시 우선
+  // 정적 자원: 네트워크 우선(업데이트 즉시 반영), 실패 시 캐시
   event.respondWith(
-    caches.match(request).then((hit) => {
-      if (hit) return hit;
-      return fetch(request).then((res) => {
-        const copy = res.clone();
-        caches.open(VERSION).then((cache) => cache.put(request, copy)).catch(() => {});
-        return res;
-      });
-    })
+    fetch(request).then((res) => {
+      const copy = res.clone();
+      caches.open(VERSION).then((cache) => cache.put(request, copy)).catch(() => {});
+      return res;
+    }).catch(() => caches.match(request))
   );
 });
